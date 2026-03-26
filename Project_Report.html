@@ -2305,6 +2305,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <section id="task-and-metrics" class="level2">
 <h2 class="anchored" data-anchor-id="task-and-metrics">3) Task and Metrics</h2>
 <p>My previous analysis report was on simple trend/data analysis. To take it a step further, I will be implementing a regression task on the data to predict the fare of an uber ride given certain predictor variables. We will evaluate this model based on RMSE, as we don’t want large errors in our model if we are to predict a fare amount. R^2 will also help us identify how well our model can explain the variance.</p>
+<p>Last report: https://looforce.github.io/UberAnalytics/Project_Report.html</p>
 </section>
 <section id="data" class="level2">
 <h2 class="anchored" data-anchor-id="data">4) Data</h2>
@@ -2325,6 +2326,59 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <p>To clean it, we are removing the “key” variable as it has no significance to our analysis. We will expand the datetime variable into 4 columns (month, day, hour, and day of week). Using the Haversine Formula, we can calculate the distance to include as another variable in the data. Additionally, there is only one observation with missing destination coordinates, therefore we will remove it as it will have little affect and can cause issues in our model if not removed. To handle extreme values that can heavily influence the model, we will limit the fare amount to 200, the distance to 100mi, and the passenger count to 7. In all, we have the variable metrics:</p>
 <p>Response: Fare Amount</p>
 <p>Predictors: Distance, Pickup longitude, Pickup latitude, Dropoff longitude, Dropoff latitude, Passenger count, month, day, hour, and day of week.</p>
+<div id="1f8ca711" class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> seaborn <span class="im">as</span> sns</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.formula.api <span class="im">as</span> smf</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LinearRegression, RidgeCV, LassoCV, LogisticRegression</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.preprocessing <span class="im">import</span> PolynomialFeatures, StandardScaler</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> root_mean_squared_error, r2_score, confusion_matrix, classification_report</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># test train split</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.model_selection <span class="im">import</span> train_test_split</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<div id="2e3b284d" class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> pd.read_csv(<span class="st">&#39;uber.csv&#39;</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data.drop(columns<span class="op">=</span>[<span class="st">&#39;Unnamed: 0&#39;</span>, <span class="st">&#39;key&#39;</span>])</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>data.dropna(inplace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>data[<span class="st">&#39;pickup_datetime&#39;</span>] <span class="op">=</span> pd.to_datetime(data[<span class="st">&#39;pickup_datetime&#39;</span>])</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>data[<span class="st">&#39;month&#39;</span>] <span class="op">=</span> data[<span class="st">&#39;pickup_datetime&#39;</span>].dt.month</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>data[<span class="st">&#39;day&#39;</span>] <span class="op">=</span> data[<span class="st">&#39;pickup_datetime&#39;</span>].dt.day</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>data[<span class="st">&#39;hour&#39;</span>] <span class="op">=</span> data[<span class="st">&#39;pickup_datetime&#39;</span>].dt.hour</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>data[<span class="st">&#39;day_of_week&#39;</span>] <span class="op">=</span> data[<span class="st">&#39;pickup_datetime&#39;</span>].dt.dayofweek</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>data.drop(columns<span class="op">=</span>[<span class="st">&#39;pickup_datetime&#39;</span>], inplace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> haversine(lat1, lon1, lat2, lon2):</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    R <span class="op">=</span> <span class="dv">6371</span>  <span class="co"># Earth radius in kilometers</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    lat1 <span class="op">=</span> np.radians(lat1)</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    lon1 <span class="op">=</span> np.radians(lon1)</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    lat2 <span class="op">=</span> np.radians(lat2)</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    lon2 <span class="op">=</span> np.radians(lon2)</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    dlat <span class="op">=</span> lat2 <span class="op">-</span> lat1</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    dlon <span class="op">=</span> lon2 <span class="op">-</span> lon1</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    a <span class="op">=</span> np.sin(dlat <span class="op">/</span> <span class="dv">2</span>)<span class="op">**</span><span class="dv">2</span> <span class="op">+</span> np.cos(lat1) <span class="op">*</span> np.cos(lat2) <span class="op">*</span> np.sin(dlon <span class="op">/</span> <span class="dv">2</span>)<span class="op">**</span><span class="dv">2</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    c <span class="op">=</span> <span class="dv">2</span> <span class="op">*</span> np.arctan2(np.sqrt(a), np.sqrt(<span class="dv">1</span> <span class="op">-</span> a))</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> R <span class="op">*</span> c</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>data[<span class="st">&#39;distance&#39;</span>] <span class="op">=</span> haversine(data[<span class="st">&#39;pickup_latitude&#39;</span>], data[<span class="st">&#39;pickup_longitude&#39;</span>], data[<span class="st">&#39;dropoff_latitude&#39;</span>], data[<span class="st">&#39;dropoff_longitude&#39;</span>])</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data[(data[<span class="st">&quot;fare_amount&quot;</span>] <span class="op">&gt;</span> <span class="dv">0</span>) <span class="op">&amp;</span> (data[<span class="st">&quot;fare_amount&quot;</span>] <span class="op">&lt;</span> <span class="dv">200</span>)]</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data[(data[<span class="st">&quot;distance&quot;</span>] <span class="op">&gt;</span> <span class="dv">0</span>) <span class="op">&amp;</span> (data[<span class="st">&quot;distance&quot;</span>] <span class="op">&lt;</span> <span class="dv">100</span>)]</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data[(data[<span class="st">&quot;passenger_count&quot;</span>] <span class="op">&gt;</span> <span class="dv">0</span>) <span class="op">&amp;</span> (data[<span class="st">&quot;passenger_count&quot;</span>] <span class="op">&lt;</span> <span class="dv">7</span>)]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
 </section>
 <section id="prediction" class="level2">
 <h2 class="anchored" data-anchor-id="prediction">5) Prediction</h2>
@@ -2332,7 +2386,15 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <h3 class="anchored" data-anchor-id="linear-regression">1. Linear Regression</h3>
 <p>Let’s begin with a simple linear regression model to predict fare amount with the distance as the only predictor variable. We choose distance because it it logically has the most effect on price.</p>
 <p>In our first model, we can already see how significant the distance predictor is to the model. Our p-value for distance is below a 0.05 threshold indicating that this predictor is statistically significant. The R-squared can also tell us that 71% of the variance can be explained by the model. Now, let’s add the other predictors one at a time in the order of: <em>distance, pickup latitude, pickup longitude, dropoff latitude, dropoff longitude, passenger count, hour, day, month, and day of week</em></p>
-<div id="f542fd4b" class="cell" data-execution_count="835">
+<div id="f542fd4b" class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>X_train, X_test, y_train, y_test <span class="op">=</span> train_test_split(data[[<span class="st">&quot;distance&quot;</span>]], data[<span class="st">&quot;fare_amount&quot;</span>], test_size<span class="op">=</span><span class="fl">0.2</span>, random_state<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>train <span class="op">=</span> pd.concat([X_train, y_train], axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>test <span class="op">=</span> pd.concat([X_test, y_test], axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> smf.ols(formula<span class="op">=</span><span class="st">&#39;fare_amount ~ distance&#39;</span>, data<span class="op">=</span>train).fit()</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>model.summary()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 <div class="cell-output cell-output-display" data-execution_count="835">
 <table class="simpletable caption-top table table-sm table-striped small">
 <caption>OLS Regression Results</caption>
@@ -2466,7 +2528,27 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <section id="multi-linear-regression" class="level3">
 <h3 class="anchored" data-anchor-id="multi-linear-regression">2. Multi-linear Regression</h3>
 <p>When we move into the multi-linear models, they do not improve, but it is possible that the interactions of these terms can make a difference For example, longitude cannot determine any specific location without latitude, and day likely doesn’t determine anything without the day of week or month.</p>
-<div id="596dba81" class="cell" data-execution_count="842">
+<div id="596dba81" class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>predictors <span class="op">=</span> [<span class="st">&#39;distance&#39;</span>, <span class="st">&#39;pickup_latitude&#39;</span>, <span class="st">&#39;pickup_longitude&#39;</span>, <span class="st">&#39;dropoff_latitude&#39;</span>, <span class="st">&#39;dropoff_longitude&#39;</span>, <span class="st">&#39;passenger_count&#39;</span>, <span class="st">&#39;hour&#39;</span>, <span class="st">&#39;day&#39;</span>, <span class="st">&#39;month&#39;</span>, <span class="st">&#39;day_of_week&#39;</span>]</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> []</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(predictors)):</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    X_train, X_test, y_train, y_test <span class="op">=</span> train_test_split(data[predictors[:i<span class="op">+</span><span class="dv">1</span>]], data[<span class="st">&quot;fare_amount&quot;</span>], test_size<span class="op">=</span><span class="fl">0.3</span>, random_state<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> LinearRegression()</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    model.fit(X_train, y_train)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    train_pred <span class="op">=</span> model.predict(X_train)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    test_pred <span class="op">=</span> model.predict(X_test)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    train_rmse <span class="op">=</span> root_mean_squared_error(y_train, train_pred)</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    test_rmse <span class="op">=</span> root_mean_squared_error(y_test, test_pred)</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    results.append((predictors[:i<span class="op">+</span><span class="dv">1</span>], train_rmse, test_rmse))</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>model_performances <span class="op">=</span> pd.DataFrame(results, columns<span class="op">=</span>[<span class="st">&quot;Predictors&quot;</span>, <span class="st">&quot;Train RMSE&quot;</span>, <span class="st">&quot;Test RMSE&quot;</span>])</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>pd.set_option(<span class="st">&#39;display.max_colwidth&#39;</span>, <span class="va">None</span>)</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>model_performances</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 <div class="cell-output cell-output-display" data-execution_count="842">
 <div>
 
@@ -2551,7 +2633,32 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <section id="polynomial-regression-with-regularization-cross-validation" class="level3">
 <h3 class="anchored" data-anchor-id="polynomial-regression-with-regularization-cross-validation">3. Polynomial Regression with Regularization &amp; Cross-Validation</h3>
 <p>Using the Scikit-learn machine learning library, we can create a model with the interaction and transformation of these terms together. Additionally, in our previous model, because our train RMSE’s were lower than our test RMSE’s, it’s indicating that it was consistenly overfitting by a small amount. Therefore we can use regularization with cross-validation to shrink the coefficients of less important variables and lessen its impact to prevent overfitting. This specific method of regularization is known as Ridge with cross-validation.</p>
-<div id="83f09b3e" class="cell" data-execution_count="837">
+<div id="83f09b3e" class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>X_train, X_test, y_train, y_test <span class="op">=</span> train_test_split(data[predictors], data[<span class="st">&quot;fare_amount&quot;</span>], test_size<span class="op">=</span><span class="fl">0.3</span>, random_state<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>poly <span class="op">=</span> PolynomialFeatures(degree<span class="op">=</span><span class="dv">3</span>, include_bias<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>X_train_poly <span class="op">=</span> poly.fit_transform(X_train)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>X_test_poly <span class="op">=</span> poly.transform(X_test)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>scaler <span class="op">=</span> StandardScaler()</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>X_train_scaled <span class="op">=</span> scaler.fit_transform(X_train_poly)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>X_test_scaled <span class="op">=</span> scaler.transform(X_test_poly)</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>alphas <span class="op">=</span> np.logspace(<span class="op">-</span><span class="dv">3</span>, <span class="dv">3</span>, <span class="dv">200</span>) </span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>ridge_CV <span class="op">=</span> RidgeCV(alphas<span class="op">=</span>alphas, cv<span class="op">=</span><span class="dv">5</span>, scoring<span class="op">=</span><span class="st">&#39;neg_root_mean_squared_error&#39;</span>)</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>ridge_CV.fit(X_train_scaled, y_train)</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>best_alpha <span class="op">=</span> ridge_CV.alpha_</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>train_pred <span class="op">=</span> ridge_CV.predict(X_train_scaled)</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>test_pred <span class="op">=</span> ridge_CV.predict(X_test_scaled)</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>train_rmse <span class="op">=</span> root_mean_squared_error(y_train, train_pred)</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>test_rmse <span class="op">=</span> root_mean_squared_error(y_test, test_pred)  </span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f&quot;Best alpha: </span><span class="sc">{</span>best_alpha<span class="sc">}</span><span class="ss">&quot;</span>)</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f&quot;Train RMSE: </span><span class="sc">{</span>train_rmse<span class="sc">}</span><span class="ss">&quot;</span>)</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f&quot;Test RMSE: </span><span class="sc">{</span>test_rmse<span class="sc">}</span><span class="ss">&quot;</span>)</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 <div class="cell-output cell-output-stdout">
 <pre><code>Best alpha: 1.1895340673703196
 Train RMSE: 4.540749949906305
@@ -2560,7 +2667,13 @@ Test RMSE: 4.629173157034097</code></pre>
 </div>
 <p>With Ridge Cross-validation, we were able to achieve a better price model RMSE for both Train and Test predictions. Additionally, our differences in the two RMSEs are smaller in this more complex model, being within a 0.1 margin. Therefore, we have nearly eliminated overfitting while preventing underfitting at the same time. So why did the RMSEs drop overall?</p>
 <p>Shown below, we can see the impact of the top 10 predictors to the model in absolute value out of all 285 predictors. While the distance stays on top as the highest predictor coefficient, close behind are the interactions and transformations of longitude/latitude with distance. This is hardly surprising as distance doesn’t have to be uber’s only price predictor, as it can depend on pickup and dropoff locations as well.</p>
-<div id="15940164" class="cell" data-execution_count="838">
+<div id="15940164" class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>feature_names <span class="op">=</span> poly.get_feature_names_out()</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>coef_df <span class="op">=</span> pd.DataFrame({<span class="st">&quot;feature&quot;</span>: feature_names,<span class="st">&quot;coefficient&quot;</span>: ridge_CV.coef_})</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>coef_df.sort_values(by<span class="op">=</span><span class="st">&quot;coefficient&quot;</span>, key<span class="op">=</span><span class="bu">abs</span>,  ascending<span class="op">=</span><span class="va">False</span>)[:<span class="dv">10</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 <div class="cell-output cell-output-display" data-execution_count="838">
 <div>
 
@@ -2631,7 +2744,11 @@ Test RMSE: 4.629173157034097</code></pre>
 </div>
 </div>
 <p>On the other end, below are the 5 least important predictors in the model. We can see that passenger count has no impact to the overall price of the model, and this makes sense as carpooling should be promoted by the company for ethical purposes. Along with this, the time metrics also seem to appear frequently, indicating that uber doesn’t factor time into their price modeling.</p>
-<div id="60457530" class="cell" data-execution_count="839">
+<div id="60457530" class="cell">
+<details class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>coef_df.sort_values(by<span class="op">=</span><span class="st">&quot;coefficient&quot;</span>, key<span class="op">=</span><span class="bu">abs</span>,  ascending<span class="op">=</span><span class="va">True</span>)[:<span class="dv">5</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
 <div class="cell-output cell-output-display" data-execution_count="839">
 <div>
 
@@ -2682,14 +2799,14 @@ Test RMSE: 4.629173157034097</code></pre>
 <h2 class="anchored" data-anchor-id="inference">6) Inference</h2>
 <p>Taking the most significant predictors in the model (the distance and longitude/latitude of both pickup and dropoff), I took the linear terms and added distance as an interaction to each spacial variable. While these interaction predictors aren’t exactly what we saw to have the the highest imapct on the model, by looking at the top 10, we see that distance is in every predictor, therefore it would make sense to have this as the main interaction term. The equation is as follows:</p>
 <p><em>fare_amount = distance + pickup_latitude + pickup_longitude + dropoff_latitude + dropoff_longitude + distance(pickup_latitude + pickup_longitude + dropoff_latitude + dropoff_longitude)</em></p>
-<div id="1b8e0b18" class="cell" data-execution_count="840">
+<div id="1b8e0b18" class="cell" data-execution_count="843">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> smf.ols(formula<span class="op">=</span><span class="st">&#39;fare_amount ~ distance + pickup_latitude + pickup_longitude + dropoff_latitude + dropoff_longitude +&#39;</span> <span class="op">\</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="st">&#39;distance*pickup_latitude + distance*pickup_longitude + distance*dropoff_latitude + distance*dropoff_longitude&#39;</span>, data<span class="op">=</span>data).fit()</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>model.summary()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> smf.ols(formula<span class="op">=</span><span class="st">&#39;fare_amount ~ distance + pickup_latitude + pickup_longitude + dropoff_latitude + dropoff_longitude +&#39;</span> <span class="op">\</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="st">&#39;distance*pickup_latitude + distance*pickup_longitude + distance*dropoff_latitude + distance*dropoff_longitude&#39;</span>, data<span class="op">=</span>data).fit()</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>model.summary()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="840">
+<div class="cell-output cell-output-display" data-execution_count="843">
 <table class="simpletable caption-top table table-sm table-striped small">
 <caption>OLS Regression Results</caption>
 <tbody>
@@ -2719,7 +2836,7 @@ Test RMSE: 4.629173157034097</code></pre>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Time:</th>
-<td>13:16:20</td>
+<td>13:39:55</td>
 <th data-quarto-table-cell-role="th">Log-Likelihood:</th>
 <td>-5.7529e+05</td>
 </tr>
